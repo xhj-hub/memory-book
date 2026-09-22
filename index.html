@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="记忆账本">
+<meta name="theme-color" content="#4c6ef5">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>记忆账本 · 艾宾浩斯错题复习</title>
+<style>
+  :root{
+    --bg:#f5f6fa; --card:#fff; --ink:#222; --sub:#888; --line:#eceef2;
+    --brand:#4c6ef5; --brand2:#3b5bdb; --ok:#37b24d; --warn:#f59f00; --bad:#e8590c; --gray:#adb5bd;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+       background:var(--bg);color:var(--ink);font-size:16px;line-height:1.6;padding-bottom:78px}
+  header{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:18px 16px 14px;
+         position:sticky;top:0;z-index:10}
+  header h1{margin:0;font-size:20px;font-weight:700}
+  header .hint{font-size:12px;opacity:.85;margin-top:2px}
+  .wrap{padding:14px 14px 20px;max-width:760px;margin:0 auto}
+  .card{background:var(--card);border-radius:14px;padding:14px 15px;margin-bottom:12px;
+        box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:20px;background:#eef1fb;color:var(--brand2);margin-right:6px}
+  .tag.reason{background:#fff3e6;color:var(--bad)}
+  .tag.mem{background:#e7f5ec;color:var(--ok)}
+  .muted{color:var(--sub);font-size:13px}
+  .kp{font-weight:600;font-size:15px;margin-bottom:4px}
+  .prompt{white-space:pre-wrap;margin:6px 0}
+  .answer{background:#f8f9fb;border-left:3px solid var(--brand);border-radius:8px;padding:10px 12px;margin-top:8px;white-space:pre-wrap}
+  .answer .lbl{font-weight:700;color:var(--brand2);font-size:13px}
+  .miss{background:#fff8f0;border-left:3px solid var(--warn);border-radius:8px;padding:10px 12px;margin-top:8px;white-space:pre-wrap}
+  .vari{margin-top:8px}
+  .vari .v{padding:6px 0;border-top:1px dashed var(--line)}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  button{font-family:inherit;font-size:15px;border:none;border-radius:10px;padding:10px 14px;cursor:pointer;color:#fff;background:var(--brand)}
+  button:active{opacity:.85}
+  button.ghost{background:#eef0f4;color:#444}
+  button.sm{padding:7px 12px;font-size:14px}
+  .grade{flex:1;min-width:70px;text-align:center;font-weight:600}
+  .g-again{background:var(--bad)} .g-hard{background:var(--warn)} .g-good{background:var(--ok)} .g-easy{background:var(--brand)}
+  .empty{text-align:center;color:var(--sub);padding:40px 10px}
+  .empty .big{font-size:40px}
+  textarea{width:100%;min-height:150px;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px;font-family:inherit}
+  select,input{font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font-family:inherit;background:#fff}
+  .nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);
+       display:flex;justify-content:space-around;padding:6px 0 max(6px,env(safe-area-inset-bottom));z-index:20}
+  .nav button{background:none;color:var(--sub);font-size:11px;padding:4px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:56px}
+  .nav button .ico{font-size:20px}
+  .nav button.on{color:var(--brand)}
+  .stat-bar{height:8px;background:#eceef2;border-radius:6px;overflow:hidden;margin-top:4px}
+  .stat-bar>i{display:block;height:100%;background:var(--ok)}
+  .pill{font-size:12px;color:#fff;background:var(--gray);border-radius:20px;padding:1px 8px}
+  .pill.due{background:var(--bad)} .pill.soon{background:var(--warn)}
+  h2.sec{font-size:15px;margin:4px 2px 10px;color:#555}
+  .toolbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;opacity:0;transition:.25s;z-index:50;pointer-events:none}
+  .toast.show{opacity:.95}
+  a{color:var(--brand2)}
+</style>
+</head>
+<body>
+<header>
+  <h1>📚 记忆账本</h1>
+  <div class="hint">艾宾浩斯错题复习 · 数据只存在本机，不联网</div>
+</header>
+
+<div class="wrap">
+  <section id="view-today"></section>
+  <section id="view-practice" style="display:none"></section>
+  <section id="view-library" style="display:none"></section>
+  <section id="view-stats" style="display:none"></section>
+  <section id="view-io" style="display:none"></section>
+</div>
+
+<nav class="nav">
+  <button data-v="today" class="on"><span class="ico">📅</span>今日复习</button>
+  <button data-v="practice"><span class="ico">✏️</span>练习</button>
+  <button data-v="library"><span class="ico">📒</span>错题库</button>
+  <button data-v="stats"><span class="ico">📊</span>统计</button>
+  <button data-v="io"><span class="ico">🔄</span>导入导出</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============ 数据与调度 ============ */
+var STORE_KEY = "study_memory_items_v1";
+var INTERVALS = [1,2,4,7,15,30];               // 艾宾浩斯：学后第 1/2/4/7/15/30 天
+var REASON_SUBJECTS = ["数学","物理","化学","科学"];
+var RATING_TXT = {again:"忘记",hard:"模糊",good:"记住",easy:"牢固"};
+
+function todayStr(){ var d=new Date(); return fmt(d); }
+function fmt(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+function pad(n){ return (n<10?"0":"")+n; }
+function addDays(dateStr,n){ var d=new Date(dateStr+"T00:00:00"); d.setDate(d.getDate()+n); return fmt(d); }
+function daysBetween(a,b){ return Math.round((new Date(b+"T00:00:00")-new Date(a+"T00:00:00"))/86400000); }
+function subjectMode(s){ return REASON_SUBJECTS.indexOf(s)>=0 ? "reasoning":"memory"; }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+function load(){
+  try{ var raw=localStorage.getItem(STORE_KEY); if(!raw) return []; var a=JSON.parse(raw); return Array.isArray(a)?a:[]; }
+  catch(e){ return []; }
+}
+function save(items){ localStorage.setItem(STORE_KEY, JSON.stringify(items)); }
+
+var ITEMS = load();
+
+function newItem(o){
+  var created = o.created_at || todayStr();
+  return {
+    id: o.id || uid(),
+    subject: o.subject||"其他",
+    knowledge_point: o.knowledge_point||"",
+    type: o.type||"其他",
+    prompt: o.prompt||"",
+    answer: o.answer||"",
+    mode: o.mode || subjectMode(o.subject||""),
+    mistake_reason: o.mistake_reason||"",
+    variations: Array.isArray(o.variations)?o.variations:[],
+    source: o.source||"手动",
+    created_at: created,
+    stage: (typeof o.stage==="number")?o.stage:0,
+    mastery: (typeof o.mastery==="number")?o.mastery:0,
+    review_count: o.review_count||0,
+    last_reviewed: o.last_reviewed||null,
+    next_review: o.next_review || addDays(created, INTERVALS[0])
+  };
+}
+
+// 应用自评评级，重排下次复习（以今天为基准）
+function applyRating(item, rating){
+  var t = todayStr();
+  if(rating==="again"){ item.stage=0; item.mastery=Math.max(0,item.mastery-2); }
+  else if(rating==="hard"){ item.mastery+=1; }               // 停留当前 stage
+  else if(rating==="good"){ item.stage=Math.min(5,item.stage+1); item.mastery+=2; }
+  else if(rating==="easy"){ item.stage=Math.min(5,item.stage+2); item.mastery+=3; }
+  item.review_count+=1;
+  item.last_reviewed=t;
+  item.last_rating=rating;
+  item.next_review = addDays(t, INTERVALS[item.stage]);
+  save(ITEMS);
+}
+
+function dueItems(){
+  var t=todayStr();
+  return ITEMS.filter(function(it){ return it.next_review<=t; })
+              .sort(function(a,b){ return a.next_review<b.next_review?-1:1; });
+}
+
+/* ============ 通用 UI ============ */
+function esc(s){ return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function toast(msg){ var t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(function(){t.classList.remove("show");},1600); }
+function modeTag(it){ return it.mode==="reasoning"?'<span class="tag reason">理解型</span>':'<span class="tag mem">记忆型</span>'; }
+function duePill(it){
+  var d=daysBetween(todayStr(), it.next_review);
+  if(d<0) return '<span class="pill due">已逾期'+(-d)+'天</span>';
+  if(d===0) return '<span class="pill due">今天</span>';
+  if(d<=2) return '<span class="pill soon">'+d+'天后</span>';
+  return '<span class="pill">'+d+'天后</span>';
+}
+function answerBlock(it){
+  var h='<div class="answer"><span class="lbl">✅ 答案 / 解析</span><br>'+esc(it.answer)+'</div>';
+  if(it.mistake_reason) h+='<div class="miss"><b>❌ 易错点：</b>'+esc(it.mistake_reason)+'</div>';
+  if(it.variations&&it.variations.length){
+    h+='<div class="vari"><b>🔁 举一反三：</b>';
+    it.variations.forEach(function(v,i){ h+='<div class="v"><b>变式'+(i+1)+'：</b>'+esc(v.q)+'<br><span class="muted">答：'+esc(v.a)+'</span></div>'; });
+    h+='</div>';
+  }
+  return h;
+}
+
+/* ============ 今日复习 ============ */
+function renderToday(){
+  var due=dueItems();
+  var el=document.getElementById("view-today");
+  if(!ITEMS.length){
+    el.innerHTML='<div class="empty"><div class="big">📥</div>还没有错题。<br>去「导入导出」把千问整理好的错题粘进来吧。</div>';
+    return;
+  }
+  if(!due.length){
+    el.innerHTML='<div class="empty"><div class="big">🎉</div>今天没有要复习的题！<br>好好休息或去「练习」提前预习。<div class="muted" style="margin-top:8px">题库共 '+ITEMS.length+' 条</div></div>';
+    return;
+  }
+  var h='<h2 class="sec">今天要复习 '+due.length+' 条（点题目看答案，再自评）</h2>';
+  due.forEach(function(it){
+    h+='<div class="card" data-id="'+it.id+'">'
+      +modeTag(it)+'<span class="tag">'+esc(it.subject)+'</span>'+duePill(it)
+      +'<div class="kp">'+esc(it.knowledge_point||it.type)+'</div>'
+      +'<div class="prompt">'+esc(it.prompt)+'</div>'
+      +'<div class="reveal"><button class="sm ghost" onclick="showAns(\''+it.id+'\')">👀 显示答案</button></div>'
+      +'<div class="ansbox" style="display:none">'+answerBlock(it)
+      +'<div class="row" style="margin-top:10px">'
+      +'<button class="grade g-again" onclick="grade(\''+it.id+'\',\'again\')">忘记</button>'
+      +'<button class="grade g-hard" onclick="grade(\''+it.id+'\',\'hard\')">模糊</button>'
+      +'<button class="grade g-good" onclick="grade(\''+it.id+'\',\'good\')">记住</button>'
+      +'<button class="grade g-easy" onclick="grade(\''+it.id+'\',\'easy\')">牢固</button>'
+      +'</div></div></div>';
+  });
+  el.innerHTML=h;
+}
+window.showAns=function(id){
+  var card=document.querySelector('#view-today .card[data-id="'+id+'"]');
+  if(!card) return;
+  card.querySelector(".reveal").style.display="none";
+  card.querySelector(".ansbox").style.display="block";
+};
+window.grade=function(id,rating){
+  var it=ITEMS.filter(function(x){return x.id===id;})[0]; if(!it) return;
+  applyRating(it,rating);
+  var next=INTERVALS[it.stage];
+  toast(RATING_TXT[rating]+"｜下次 "+next+" 天后复习");
+  renderToday();
+};
+
+/* ============ 练习 ============ */
+function renderPractice(){
+  var el=document.getElementById("view-practice");
+  var subjects=uniqueSubjects();
+  var h='<div class="toolbar"><span class="muted">范围</span><select id="pracSubj"><option value="">全部学科</option>';
+  subjects.forEach(function(s){ h+='<option value="'+esc(s)+'">'+esc(s)+'</option>'; });
+  h+='</select><button class="sm" onclick="genPractice()">生成练习卷</button>'
+    +'<button class="sm ghost" onclick="toggleAllAns()">显示/隐藏答案</button></div>'
+    +'<div id="pracOut"></div>';
+  el.innerHTML=h;
+  genPractice();
+}
+window.genPractice=function(){
+  var subj=(document.getElementById("pracSubj")||{}).value||"";
+  var list=ITEMS.filter(function(it){ return !subj||it.subject===subj; });
+  var out=document.getElementById("pracOut");
+  if(!list.length){ out.innerHTML='<div class="empty">该范围暂无题目</div>'; return; }
+  var h='<h2 class="sec">练习卷（'+list.length+' 题）· 先独立做，再点显示答案</h2>';
+  list.forEach(function(it,idx){
+    h+='<div class="card">'+modeTag(it)+'<span class="tag">'+esc(it.subject)+'</span>'
+      +'<div class="kp">'+(idx+1)+'. '+esc(it.knowledge_point||it.type)+'</div>';
+    if(it.mode==="reasoning"&&it.variations&&it.variations.length){
+      h+='<div class="prompt">'+esc(it.prompt)+'</div><div class="muted">先做下面的变式题：</div>';
+      it.variations.forEach(function(v,i){ h+='<div class="prompt">· 变式'+(i+1)+'：'+esc(v.q)+'</div>'; });
+    }else{
+      h+='<div class="prompt">'+esc(it.prompt)+'</div>';
+    }
+    h+='<div class="reveal"><button class="sm ghost" onclick="this.parentNode.nextSibling.style.display=\'block\';this.parentNode.style.display=\'none\'">👀 显示答案</button></div>'
+      +'<div class="ansbox" style="display:none">'+answerBlock(it)+'</div></div>';
+  });
+  out.innerHTML=h;
+};
+window.toggleAllAns=function(){
+  var boxes=document.querySelectorAll('#pracOut .ansbox');
+  var anyHidden=false; boxes.forEach(function(b){ if(b.style.display==="none") anyHidden=true; });
+  boxes.forEach(function(b){ b.style.display=anyHidden?"block":"none"; });
+  document.querySelectorAll('#pracOut .reveal').forEach(function(r){ r.style.display=anyHidden?"none":"block"; });
+};
+
+/* ============ 错题库 ============ */
+function renderLibrary(){
+  var el=document.getElementById("view-library");
+  var subjects=uniqueSubjects();
+  var h='<div class="toolbar"><select id="libSubj" onchange="renderLibrary()"><option value="">全部学科('+ITEMS.length+')</option>';
+  subjects.forEach(function(s){ var n=ITEMS.filter(function(x){return x.subject===s;}).length; h+='<option value="'+esc(s)+'"'+(window._libSubj===s?" selected":"")+'>'+esc(s)+'('+n+')</option>'; });
+  h+='</select></div>';
+  var subj=(document.getElementById("libSubj")||{}).value; if(subj!==undefined) window._libSubj=subj;
+  var list=ITEMS.filter(function(it){ return !window._libSubj||it.subject===window._libSubj; })
+                .sort(function(a,b){ return a.created_at<b.created_at?1:-1; });
+  if(!list.length){ el.innerHTML=h+'<div class="empty">暂无题目</div>'; renderLibSelect(subjects); return; }
+  list.forEach(function(it){
+    h+='<div class="card">'+modeTag(it)+'<span class="tag">'+esc(it.subject)+'</span>'+duePill(it)
+      +'<span class="muted" style="float:right">复习'+it.review_count+'次·掌握'+it.mastery+'</span>'
+      +'<div class="kp">'+esc(it.knowledge_point||it.type)+'</div>'
+      +'<div class="prompt">'+esc(it.prompt)+'</div>'
+      +'<div class="reveal"><button class="sm ghost" onclick="this.parentNode.nextSibling.style.display=\'block\';this.parentNode.style.display=\'none\'">答案</button> '
+      +'<button class="sm ghost" onclick="delItem(\''+it.id+'\')">删除</button></div>'
+      +'<div class="ansbox" style="display:none">'+answerBlock(it)
+      +'<div class="muted" style="margin-top:6px">录入 '+it.created_at+' · 下次复习 '+it.next_review+'</div></div></div>';
+  });
+  el.innerHTML=h;
+}
+function renderLibSelect(){}
+window.delItem=function(id){
+  if(!confirm("确定删除这道题？")) return;
+  ITEMS=ITEMS.filter(function(x){return x.id!==id;}); save(ITEMS);
+  toast("已删除"); renderLibrary();
+};
+
+/* ============ 统计 ============ */
+function renderStats(){
+  var el=document.getElementById("view-stats");
+  if(!ITEMS.length){ el.innerHTML='<div class="empty">还没有数据</div>'; return; }
+  var bySubj={};
+  ITEMS.forEach(function(it){ (bySubj[it.subject]=bySubj[it.subject]||[]).push(it); });
+  var h='<h2 class="sec">各学科掌握进度</h2>';
+  Object.keys(bySubj).forEach(function(s){
+    var arr=bySubj[s]; var avg=arr.reduce(function(a,b){return a+Math.max(0,b.stage);},0)/arr.length;
+    var pct=Math.round(avg/5*100);
+    h+='<div class="card"><b>'+esc(s)+'</b> <span class="muted">'+arr.length+'题 · 平均阶段'+avg.toFixed(1)+'/5</span>'
+      +'<div class="stat-bar"><i style="width:'+pct+'%"></i></div></div>';
+  });
+  // 薄弱知识点：忘记(again)次数 / 复习多但阶段低
+  var weak=ITEMS.slice().sort(function(a,b){
+    var sa=(a.last_rating==="again"?100:0)+a.review_count-a.stage*3;
+    var sb=(b.last_rating==="again"?100:0)+b.review_count-b.stage*3;
+    return sb-sa;
+  }).slice(0,5);
+  h+='<h2 class="sec">建议加练的薄弱点 TOP5</h2>';
+  weak.forEach(function(it){
+    h+='<div class="card">'+modeTag(it)+'<span class="tag">'+esc(it.subject)+'</span>'
+      +'<div class="kp">'+esc(it.knowledge_point||it.type)+'</div>'
+      +'<div class="muted">复习'+it.review_count+'次·阶段'+it.stage+(it.last_rating?'·上次'+RATING_TXT[it.last_rating]:'')+'</div></div>';
+  });
+  el.innerHTML=h;
+}
+
+/* ============ 导入导出 ============ */
+function renderIO(){
+  var el=document.getElementById("view-io");
+  el.innerHTML=
+    '<div class="card"><b>① 从千问导入错题</b><div class="muted">把千问智能体整理出的 JSON（一个数组）粘贴到下面，点导入。已存在的相同题目会自动跳过。</div>'
+    +'<textarea id="impText" placeholder=\'[{"subject":"数学","knowledge_point":"...","type":"应用题","prompt":"...","answer":"...","mistake_reason":"...","variations":[{"q":"...","a":"..."}]}]\'></textarea>'
+    +'<div class="row" style="margin-top:8px"><button onclick="doImport()">导入</button>'
+    +'<button class="ghost" onclick="document.getElementById(\'impText\').value=\'\'">清空</button></div></div>'
+    +'<div class="card"><b>② 备份 / 导出</b><div class="muted">复制下面全部数据保存，可在换设备时粘回上方导入框恢复。</div>'
+    +'<textarea id="expText" readonly>'+esc(JSON.stringify(ITEMS,null,0))+'</textarea>'
+    +'<div class="row" style="margin-top:8px"><button onclick="copyExport()">复制全部</button>'
+    +'<button class="ghost" onclick="downloadBackup()">下载备份文件</button></div></div>'
+    +'<div class="card"><b>③ 危险操作</b><div class="row" style="margin-top:6px">'
+    +'<button class="ghost" style="color:#e8590c" onclick="clearAll()">清空所有数据</button></div></div>';
+}
+window.doImport=function(){
+  var raw=document.getElementById("impText").value.trim();
+  if(!raw){ toast("请先粘贴 JSON"); return; }
+  var arr;
+  try{ arr=JSON.parse(raw); }catch(e){ toast("JSON 格式错误"); return; }
+  if(!Array.isArray(arr)){ if(arr&&Array.isArray(arr.items)) arr=arr.items; else { toast("需要是一个数组"); return; } }
+  var added=0,skipped=0;
+  arr.forEach(function(o){
+    if(!o||!o.subject||!o.answer){ skipped++; return; }
+    var dup=ITEMS.some(function(x){ return x.subject===o.subject && (x.prompt||"")===(o.prompt||"") && x.answer===o.answer; });
+    if(dup){ skipped++; return; }
+    ITEMS.push(newItem(o)); added++;
+  });
+  save(ITEMS);
+  toast("导入完成：新增"+added+"，跳过"+skipped);
+  document.getElementById("impText").value="";
+  renderIO();
+};
+window.copyExport=function(){
+  var ta=document.getElementById("expText"); ta.select(); ta.setSelectionRange(0,999999);
+  try{ document.execCommand("copy"); toast("已复制"); }catch(e){ toast("请长按手动复制"); }
+};
+window.downloadBackup=function(){
+  var blob=new Blob([JSON.stringify(ITEMS,null,2)],{type:"application/json"});
+  var a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="记忆账本备份_"+todayStr()+".json"; a.click();
+  toast("已生成备份文件");
+};
+window.clearAll=function(){
+  if(!confirm("确定清空所有错题和进度？此操作不可恢复！")) return;
+  ITEMS=[]; save(ITEMS); toast("已清空"); renderIO();
+};
+
+/* ============ 工具 ============ */
+function uniqueSubjects(){ var s=[]; ITEMS.forEach(function(it){ if(s.indexOf(it.subject)<0) s.push(it.subject); }); return s; }
+
+/* ============ 导航 ============ */
+var RENDER={today:renderToday,practice:renderPractice,library:renderLibrary,stats:renderStats,io:renderIO};
+function switchView(v){
+  ["today","practice","library","stats","io"].forEach(function(k){
+    document.getElementById("view-"+k).style.display=(k===v)?"block":"none";
+  });
+  document.querySelectorAll(".nav button").forEach(function(b){ b.classList.toggle("on", b.dataset.v===v); });
+  RENDER[v]();
+}
+document.querySelectorAll(".nav button").forEach(function(b){
+  b.addEventListener("click",function(){ switchView(b.dataset.v); });
+});
+
+/* 首次启动塞两条示例，方便体验；有数据则不塞 */
+if(!ITEMS.length && !localStorage.getItem(STORE_KEY+"_seeded")){
+  localStorage.setItem(STORE_KEY+"_seeded","1");
+}
+switchView("today");
+
+/* 注册 Service Worker：让页面可离线安装使用（数据仍只在本地 localStorage） */
+if("serviceWorker" in navigator){
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("sw.js").then(function(reg){
+      reg.addEventListener("updatefound", function(){
+        var nw=reg.installing;
+        if(!nw) return;
+        nw.addEventListener("statechange", function(){
+          if(nw.state==="activated") toast("已更新，离线可用");
+        });
+      });
+    }).catch(function(){ /* 本地 file:// 打开时无法注册，忽略 */ });
+  });
+}
+</script>
+</body>
+</html>
